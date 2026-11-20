@@ -4,6 +4,7 @@ package ostacoli;
 import geometria.Rettangolo;
 import java.util.ArrayList;
 import java.util.List;
+import pong.Bordo;
 
 /**
  * Il motore dei livelli: dato il numero del livello, decide quanto va veloce la palla, quanto sbaglia
@@ -39,7 +40,29 @@ public class MotoreDeiLivelli {
         }
         double velocita = VELOCITA_AL_LIVELLO_1 + VELOCITA_IN_PIU_A_OGNI_LIVELLO * (numero - 1);
         double errore = Math.max(0, ERRORE_AL_LIVELLO_1 - ERRORE_IN_MENO_A_OGNI_LIVELLO * (numero - 1));
-        return new Livello(numero, velocita, errore, new Ostacoli(ostacoli(numero, larghezzaCampo / 2.0, altezzaCampo / 2.0)));
+        Bordo bordoUmano = Bordo.SINISTRA;
+        Bordo bordoAutomatico = Bordo.DESTRA;
+        if (numero == 2) {
+            bordoUmano = Bordo.BASSO;
+            bordoAutomatico = Bordo.ALTO;
+        } else if (numero == 3) {
+            bordoUmano = Bordo.SINISTRA;
+            bordoAutomatico = Bordo.ALTO;
+        } else if (numero == 4) {
+            bordoUmano = Bordo.BASSO;
+            bordoAutomatico = Bordo.DESTRA;
+        } else if (numero == 5) {
+            bordoUmano = Bordo.ALTO;
+            bordoAutomatico = Bordo.SINISTRA;
+        }
+        
+        return new Livello(
+                numero,
+                velocita,
+                errore,
+                new Ostacoli(ostacoli(numero, larghezzaCampo / 2.0, altezzaCampo / 2.0)),
+                bordoUmano,
+                bordoAutomatico);
     }
 
     /**

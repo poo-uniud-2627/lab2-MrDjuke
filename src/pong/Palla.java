@@ -54,12 +54,29 @@ public class Palla {
      * a caso; velocita sono i pixel per fotogramma in orizzontale (la decide il livello).
      */
     void lancia(double x, double y, boolean versoDestra, double velocita) {
-        posizione = new Posizione(x, y);
-        rimbalziDaLancio = 0;
-        velocitaX = versoDestra ? velocita : -velocita;
-        velocitaY = (caso.nextDouble() * 2 - 1) * velocita * 0.6;
+        lancia(x, y, versoDestra ? Bordo.DESTRA : Bordo.SINISTRA, velocita);
     }
 
+    /** Rimette la palla in un punto e la lancia verso un bordo, con un po di angolo a caso. */
+
+    void lancia(double x, double y, Bordo verso, double velocita){
+        posizione = new Posizione(x, y);
+        rimbalziDaLancio = 0;
+        double deviazione = (caso.nextDouble() * 2 - 1) * velocita * 0.6;
+        if (verso == Bordo.DESTRA) {
+            velocitaX = velocita;
+            velocitaY = deviazione;
+        } else if (verso == Bordo.SINISTRA) {
+            velocitaX = -velocita;
+            velocitaY = deviazione;
+        } else if (verso == Bordo.BASSO) {
+            velocitaX = deviazione;
+            velocitaY = velocita;
+        } else {
+            velocitaX = deviazione;
+            velocitaY = -velocita;
+        }
+    }
     /** Ferma la palla in un punto (prima di cominciare una partita). */
     void fermaIn(double x, double y) {
         posizione = new Posizione(x, y);
@@ -74,6 +91,11 @@ public class Palla {
     /** Rimbalzo sul bordo alto o basso del campo: si inverte solo la direzione verticale. */
     void rimbalzaVerticale() {
         velocitaY = -velocitaY;
+    }
+
+    /** Rimbalzo sul bordo sinistro o destro del campo: si inverte solo la direzione orizzontale */
+    void rimbalzoOrizzontale(){
+        velocitaX = -velocitaX;
     }
 
     /** Vero se la palla, in questo istante, si sovrappone alla racchetta. */
@@ -92,19 +114,31 @@ public class Palla {
      * da dove ha colpito la racchetta (al centro va dritta, sui bordi va in diagonale).
      */
     void rimbalzaSu(Racchetta racchetta) {
-        double velocita = Math.abs(velocitaX) * ACCELERAZIONE_A_OGNI_RIMBALZO;
+        double velocitaArrivo = Math.max(Math.abs(velocitaX), Math.abs(velocitaY));
+        double velocita = velocitaArrivo * ACCELERAZIONE_A_OGNI_RIMBALZO;
         rimbalziDaLancio++;
         if (rimbalziDaLancio % RIMBALZI_PER_ACCELERARE == 0) {
-            velocita = Math.min(velocita * ACCELERAZIONE_OGNI_TOT_RIMBALZI, Math.max(VELOCITA_MASSIMA, Math.abs(velocitaX)));
+            velocita = Math.min(velocita * ACCELERAZIONE_OGNI_TOT_RIMBALZI, Math.max(VELOCITA_MASSIMA, velocitaArrivo));
         }
-        double scostamento = (posizione.y() - racchetta.getCentroY()) / (racchetta.getAltezza() / 2.0);
-        velocitaY = scostamento * velocita;
-        velocitaX = velocitaX > 0 ? -velocita : velocita;
-        // la palla viene spostata appena fuori dalla racchetta, così non rimbalza due volte
-        if (velocitaX > 0) {
-            posizione = new Posizione(racchetta.getX() + racchetta.getLarghezza() + RAGGIO, posizione.y());
+
+        if (racchetta.getBordo().orizzontale()) {
+            double scostamento = (posizione.x() - racchetta.getCentroX()) / (racchetta.getLarghezza() / 2.0);
+            velocitaX = scostamento * velocita;
+            velocitaY = velocitaY > 0 ? -velocita : velocita;
+            if (velocitaY > 0) {
+                posizione = new Posizione(posizione.x(), racchetta.getY() + racchetta.getAltezza() + RAGGIO);
+            } else {
+                posizione = new Posizione(posizione.x(), racchetta.getY() - RAGGIO);
+            }
         } else {
-            posizione = new Posizione(racchetta.getX() - RAGGIO, posizione.y());
+            double scostamento = (posizione.y() - racchetta.getCentroY()) / (racchetta.getAltezza() / 2.0);
+            velocitaY = scostamento * velocita;
+            velocitaX = velocitaX > 0 ? -velocita : velocita;
+            if (velocitaX > 0) {
+                posizione = new Posizione(racchetta.getX() + racchetta.getLarghezza() + RAGGIO, posizione.y());
+            } else {
+                posizione = new Posizione(racchetta.getX() - RAGGIO, posizione.y());
+            }
         }
     }
 

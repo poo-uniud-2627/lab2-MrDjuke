@@ -94,8 +94,8 @@ class Schermo extends JPanel {
         }
 
         g2.setColor(Color.WHITE);
-        disegna(g2, partita.getRacchettaSinistra());
-        disegna(g2, partita.getRacchettaDestra());
+        disegna(g2, partita.getRacchettaUmana());
+        disegna(g2, partita.getRacchettaAutomatica());
         Palla palla = partita.getPalla();
         int r = palla.getRaggio();
         Posizione p = palla.getPosizione();
@@ -120,7 +120,7 @@ class Schermo extends JPanel {
     }
 
     private static void disegna(Graphics2D g2, Racchetta racchetta) {
-        g2.fillRect(racchetta.getX(), (int) Math.round(racchetta.getY()),
+        g2.fillRect((int) Math.round(racchetta.getX()), (int) Math.round(racchetta.getY()),
                 racchetta.getLarghezza(), racchetta.getAltezza());
     }
 

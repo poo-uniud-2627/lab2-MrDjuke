@@ -18,10 +18,10 @@ class Partita {
     static final int SCARTO_MINIMO = 2;
 
     private final Campo campo;
-    private final Giocatore giocatoreSinistra;
-    private Giocatore giocatoreDestra;
-    private final Racchetta racchettaSinistra;
-    private final Racchetta racchettaDestra;
+    private final Giocatore giocatoreUmano;
+    private Giocatore giocatoreAutomatico;
+    private Racchetta racchettaUmana ;
+    private Racchetta racchettaAutomatica;
     private final Palla palla;
     private final Punteggio punteggio = new Punteggio(PUNTI_PER_VINCERE, SCARTO_MINIMO);
     private Livello livello;
@@ -31,10 +31,7 @@ class Partita {
     /** Una partita fra umano, a sinistra, e il giocatore automatico, a destra; si comincia dal livello 1. */
     Partita(Campo campo, Giocatore umano) {
         this.campo = campo;
-        this.giocatoreSinistra = umano;
-        double centroY = campo.getAltezza() / 2.0 - Racchetta.ALTEZZA / 2.0;
-        this.racchettaSinistra = new Racchetta(30, centroY);
-        this.racchettaDestra = new Racchetta(campo.getLarghezza() - 30 - Racchetta.LARGHEZZA, centroY);
+        this.giocatoreUmano = umano;
         this.palla = new Palla(campo.getLarghezza() / 2.0, campo.getAltezza() / 2.0);
         preparaLivello(1);
     }
@@ -47,7 +44,9 @@ class Partita {
     void preparaLivello(int numero) {
         livello = MotoreDeiLivelli.livello(numero, campo.getLarghezza(), campo.getAltezza());
         ostacoli = livello.ostacoli();
-        giocatoreDestra = new GiocatoreAutomatico(livello.erroreMassimo());
+        racchettaUmana = new Racchetta(livello.bordoUmano(), campo);
+        racchettaAutomatica = new Racchetta(livello.bordoAutomatico(), campo);
+        giocatoreAutomatico = new GiocatoreAutomatico(livello.erroreMassimo());
         punteggio.azzera();
         iniziata = false;
         palla.fermaIn(campo.getLarghezza() / 2.0, campo.getAltezza() / 2.0);
@@ -67,6 +66,11 @@ class Partita {
     /** Vero se la partita è cominciata (anche se poi è finita). */
     boolean isIniziata() { return iniziata; }
 
+    /** Vero se su quel bordo non gioca nessuna racchetta, quindi la palla ci rimbalza. */
+    boolean isMuro(Bordo bordo) {
+        return bordo != livello.bordoUmano() && bordo != livello.bordoAutomatico();
+    }
+
     Livello getLivello() { return livello; }
     Ostacoli getOstacoli() { return ostacoli; }
 
@@ -78,12 +82,13 @@ class Partita {
     void avvia() {
         if (iniziata) preparaLivello(livello.numero());
         iniziata = true;
-        lanciaPalla(new Random().nextBoolean());
+        Bordo bersaglio = new Random().nextBoolean() ? livello.bordoUmano() : livello.bordoAutomatico();
+        lanciaPalla(bersaglio);
     }
 
     /** Lancia la palla dal centro, alla velocità del livello. */
-    private void lanciaPalla(boolean versoDestra) {
-        palla.lancia(campo.getLarghezza() / 2.0, campo.getAltezza() / 2.0, versoDestra, livello.velocitaPalla());
+    private void lanciaPalla(Bordo verso) {
+        palla.lancia(campo.getLarghezza() / 2.0, campo.getAltezza() / 2.0, verso, livello.velocitaPalla());
     }
 
     /** Un passo del gioco: viene chiamato 60 volte al secondo. */
@@ -99,20 +104,36 @@ class Partita {
 
     /** Chiede a ciascun giocatore cosa vuole fare, e lo fa. Non sa chi sono i giocatori. */
     private void muoviRacchette() {
-        Mossa mossaSinistra = giocatoreSinistra.decidiMossa(palla, racchettaSinistra);
-        Mossa mossaDestra = giocatoreDestra.decidiMossa(palla, racchettaDestra);
-        racchettaSinistra.muovi(mossaSinistra, campo);
-        racchettaDestra.muovi(mossaDestra, campo);
+        Mossa mossaUmana = giocatoreUmano.decidiMossa(palla, racchettaUmana);
+        Mossa mossaAutomatica = giocatoreAutomatico.decidiMossa(palla, racchettaAutomatica);
+        racchettaUmana.muovi(mossaUmana, campo);
+        racchettaAutomatica.muovi(mossaAutomatica, campo);
     }
 
     private void controllaRimbalzi() {
+        double x = palla.getPosizione().x();
         double y = palla.getPosizione().y();
-        boolean toccaAlto = y - palla.getRaggio() <= 0 && palla.getVelocitaY() < 0;
-        boolean toccaBasso = y + palla.getRaggio() >= campo.getAltezza() && palla.getVelocitaY() > 0;
-        if (toccaAlto || toccaBasso) palla.rimbalzaVerticale();
+        int r = palla.getRaggio();
 
-        if (palla.tocca(racchettaSinistra) && palla.getVelocitaX() < 0) palla.rimbalzaSu(racchettaSinistra);
-        if (palla.tocca(racchettaDestra) && palla.getVelocitaX() > 0) palla.rimbalzaSu(racchettaDestra);
+        if (isMuro(Bordo.ALTO) && y - r <= 0 && palla.getVelocitaY() < 0) palla.rimbalzaVerticale();
+        if (isMuro(Bordo.BASSO) && y + r >= campo.getAltezza() && palla.getVelocitaY() > 0) palla.rimbalzaVerticale();
+        if (isMuro(Bordo.SINISTRA) && x - r <= 0 && palla.getVelocitaX() < 0) palla.rimbalzoOrizzontale();
+        if (isMuro(Bordo.DESTRA) && x + r >= campo.getLarghezza() && palla.getVelocitaX() > 0) palla.rimbalzoOrizzontale();
+
+        controllaRimbalzoSu(racchettaUmana);
+        controllaRimbalzoSu(racchettaAutomatica);
+    }
+
+    private void controllaRimbalzoSu(Racchetta racchetta) {
+        if (!palla.tocca(racchetta)) return;
+        Bordo b = racchetta.getBordo();
+        boolean vaVersoLaRacchetta = (b == Bordo.SINISTRA && palla.getVelocitaX() < 0)
+                || (b == Bordo.DESTRA && palla.getVelocitaX() > 0)
+                || (b == Bordo.ALTO && palla.getVelocitaY() < 0)
+                || (b == Bordo.BASSO && palla.getVelocitaY() > 0);
+        if (vaVersoLaRacchetta) {
+            palla.rimbalzaSu(racchetta);
+        }
     }
 
     /**
@@ -130,26 +151,35 @@ class Partita {
     /** Se la palla è uscita da un lato, il punto va all'altro lato. */
     private void controllaPunto() {
         double x = palla.getPosizione().x();
-        if (x < 0) {
+        double y = palla.getPosizione().y();
+        Bordo uscita = null;
+        if (x < 0) uscita = Bordo.SINISTRA;
+        else if (x > campo.getLarghezza()) uscita = Bordo.DESTRA;
+        else if (y < 0) uscita = Bordo.ALTO;
+        else if (y > campo.getAltezza()) uscita = Bordo.BASSO;
+
+        if (uscita == null) return;
+
+        if (uscita == livello.bordoUmano()) {
             punteggio.segnaPunto(Lato.DESTRA);
-            dopoIlPunto(true);
-        } else if (x > campo.getLarghezza()) {
+            dopoIlPunto(livello.bordoUmano());
+        } else if (uscita == livello.bordoAutomatico()) {
             punteggio.segnaPunto(Lato.SINISTRA);
-            dopoIlPunto(false);
+            dopoIlPunto(livello.bordoAutomatico());
         }
     }
 
     /** Dopo un punto: se la partita non è finita si serve verso chi ha subito il punto, altrimenti la palla si ferma. */
-    private void dopoIlPunto(boolean versoSinistra) {
+    private void dopoIlPunto(Bordo versoChiHaSubito) {
         if (punteggio.isFinita()) {
             palla.fermaIn(campo.getLarghezza() / 2.0, campo.getAltezza() / 2.0);
         } else {
-            lanciaPalla(!versoSinistra);
+            lanciaPalla(versoChiHaSubito);
         }
     }
 
     Campo getCampo() { return campo; }
     Palla getPalla() { return palla; }
-    Racchetta getRacchettaSinistra() { return racchettaSinistra; }
-    Racchetta getRacchettaDestra() { return racchettaDestra; }
+    Racchetta getRacchettaUmana() { return racchettaUmana; }
+    Racchetta getRacchettaAutomatica() { return racchettaAutomatica; }
 }
